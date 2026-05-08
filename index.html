@@ -17,6 +17,7 @@
     <meta name="msapplication-TileImage" content="./assets/images/logoPizza.png">
     <meta property="og:image" content="./assets/images/logoPizza.png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body {
             font-family: 'Barlow', sans-serif;
@@ -198,7 +199,7 @@
                 </div>
                 <button onclick="fecharPedido()"
                     class="w-full bg-red-600 text-white py-3 rounded-xl text-lg font-bold shadow-lg hover:bg-red-700 active:scale-95 transition-all">
-                    Fechar Pedido via WhatsApp
+                    Fechar Pedido
                 </button>
             </div>
         </div>
@@ -467,16 +468,53 @@
             });
         }
 
-        function fecharPedido() {
-            if (carrinho.length === 0) return;
-            let msg = '🍕 *Pedido - Pizzaria Mamma mia*\n\n';
-            carrinho.forEach(item => {
-                msg += `• ${item.nome} x${item.quantidade} — ${(item.preco * item.quantidade).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n`;
-            });
-            const total = carrinho.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
-            msg += `\n*Total: ${total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}*`;
+        const supabaseUrl = 'https://mounfaoibkplygbcdraw.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vdW5mYW9pYmtwbHlnYmNkcmF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTYxMTQsImV4cCI6MjA5MDE3MjExNH0.PffWaRug2AqN2vnU1Xe7DK1Gh0teGRS9eaLM0fzGhAg';
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-            window.open(`https://wa.me/5515996826049?text=${encodeURIComponent(msg)}`, '_blank');
+        async function fecharPedido() {
+            if (carrinho.length === 0) return;
+
+            const nomeCliente = prompt("Por favor, digite seu nome para o pedido:");
+            if (!nomeCliente) {
+                alert("O nome é obrigatório para enviar o pedido.");
+                return;
+            }
+
+            const total = carrinho.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
+            const itensFormatados = carrinho.map(item => `${item.quantidade}x ${item.nome}`);
+
+            try {
+                const btn = document.querySelector('button[onclick="fecharPedido()"]');
+                const textoOriginal = btn.innerText;
+                btn.innerText = "Enviando...";
+                btn.disabled = true;
+
+                const { error } = await supabaseClient
+                    .from('pedidos')
+                    .insert([{ 
+                        cliente: nomeCliente, 
+                        itens: itensFormatados,
+                        total: total,
+                        tipo_entrega: 'Delivery' 
+                    }]);
+
+                if (error) throw error;
+
+                alert("Pedido enviado para a cozinha com sucesso!");
+                
+                carrinho = []; 
+                atualizarCarrinho();
+                fecharModalCarrinho();
+
+            } catch (error) {
+                console.error("Erro ao enviar pedido:", error);
+                alert("Ocorreu um erro ao enviar o pedido. Tente novamente.");
+            } finally {
+                const btn = document.querySelector('button[onclick="fecharPedido()"]');
+                btn.innerText = "Fechar Pedido";
+                btn.disabled = false;
+            }
         }
 
         if('serviceWorker' in navigator){
