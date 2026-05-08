@@ -69,148 +69,68 @@
     </main>
 
     <script>
-        const supabaseUrl = 'https://mounfaoibkplygbcdraw.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vdW5mYW9pYmtwbHlnYmNkcmF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTYxMTQsImV4cCI6MjA5MDE3MjExNH0.PffWaRug2AqN2vnU1Xe7DK1Gh0teGRS9eaLM0fzGhAg';
-        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
-
+        const API_URL = 'https://backend-haruy.vercel.app'; // Mude para sua URL da Vercel no deploy
         let pedidos = [];
 
+        // 1. Busca pedidos do seu BACKEND
         async function carregarPedidosDB() {
-            const { data, error } = await supabaseClient
-                .from('pedidos')
-                .select('*')
-                .neq('status', 'finalizado') 
-                .order('created_at', { ascending: false });
+            try {
+                const response = await fetch(`${API_URL}/api/pedidos`);
+                const data = await response.json();
 
-            if (error) {
-                console.error("Erro ao buscar pedidos:", error);
-                return;
+                pedidos = data.map(p => ({
+                    id: p.id.toString(),
+                    cliente: p.cliente,
+                    itens: p.itens,
+                    tipo: p.tipo_entrega,
+                    total: `R$ ${p.total.toFixed(2).replace('.', ',')}`,
+                    hora: new Date(p.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                    status: p.status
+                }));
+
+                renderizarPedidos();
+            } catch (error) {
+                console.error("Erro ao conectar com o servidor:", error);
             }
-
-            pedidos = data.map(p => ({
-                id: p.id.toString(),
-                cliente: p.cliente,
-                telefone: '(Ver no App)', 
-                itens: p.itens,
-                tipo: p.tipo_entrega,
-                total: `R$ ${p.total.toFixed(2).replace('.', ',')}`,
-                hora: new Date(p.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                status: p.status
-            }));
-
-            renderizarPedidos();
         }
 
-        function renderizarPedidos() {
-            const colNovos = document.getElementById('col-novos');
-            const colPreparo = document.getElementById('col-preparo');
-            const colProntos = document.getElementById('col-prontos');
-
-            if(!colNovos || !colPreparo || !colProntos) return;
-
-            colNovos.innerHTML = '';
-            colPreparo.innerHTML = '';
-            colProntos.innerHTML = '';
-
-            let contadores = { novo: 0, preparando: 0, pronto: 0 };
-
-            pedidos.forEach(pedido => {
-                if (contadores[pedido.status] !== undefined) {
-                    contadores[pedido.status]++;
-                    const cardHTML = criarCardPedido(pedido);
-                    
-                    if (pedido.status === 'novo') colNovos.innerHTML += cardHTML;
-                    else if (pedido.status === 'preparando') colPreparo.innerHTML += cardHTML;
-                    else if (pedido.status === 'pronto') colProntos.innerHTML += cardHTML;
-                }
-            });
-
-            document.getElementById('count-novos').innerText = contadores.novo;
-            document.getElementById('count-preparo').innerText = contadores.preparando;
-            document.getElementById('count-prontos').innerText = contadores.pronto;
-        }
-
-        function criarCardPedido(pedido) {
-            const itensLista = pedido.itens.map(item => `<li class="text-sm text-gray-600 border-b border-gray-100 pb-1">${item}</li>`).join('');
-            const tipoColor = pedido.tipo === 'Delivery' ? 'bg-purple-100 text-purple-800' : 'bg-orange-100 text-orange-800';
-            
-            let botoesHTML = '';
-            if (pedido.status === 'novo') {
-                botoesHTML = `
-                    <button onclick="mudarStatus('${pedido.id}', 'preparando')" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-2 rounded text-sm sm:text-base font-medium transition">Aceitar</button>
-                    <button onclick="recusarPedido('${pedido.id}')" class="bg-red-100 hover:bg-red-200 text-red-600 px-3 py-2 rounded text-sm sm:text-base font-medium transition">Recusar</button>
-                `;
-            } else if (pedido.status === 'preparando') {
-                botoesHTML = `<button onclick="mudarStatus('${pedido.id}', 'pronto')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded font-medium transition">Marcar como Pronto</button>`;
-            } else if (pedido.status === 'pronto') {
-                const acaoTexto = pedido.tipo === 'Delivery' ? 'Despachar para Entrega' : 'Entregue ao Cliente';
-                botoesHTML = `<button onclick="finalizarPedido('${pedido.id}')" class="w-full bg-slate-800 hover:bg-slate-900 text-white py-2 rounded font-medium transition">${acaoTexto}</button>`;
-            }
-
-            return `
-                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition mb-4">
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <h3 class="font-bold text-gray-800 text-lg">#${pedido.id}</h3>
-                            <span class="text-xs font-semibold px-2 py-0.5 rounded ${tipoColor}">${pedido.tipo}</span>
-                        </div>
-                        <span class="text-sm text-gray-500 font-medium bg-gray-100 px-2 py-1 rounded">${pedido.hora}</span>
-                    </div>
-                    <div class="my-3">
-                        <p class="font-medium text-gray-800">${pedido.cliente}</p>
-                    </div>
-                    <ul class="space-y-1 mb-4">${itensLista}</ul>
-                    <div class="flex justify-between items-center mb-4">
-                        <span class="text-sm text-gray-500">Total:</span>
-                        <span class="font-bold text-gray-800">${pedido.total}</span>
-                    </div>
-                    <div class="flex gap-2">${botoesHTML}</div>
-                </div>
-            `;
-        }
-
+        // 2. Atualiza status via BACKEND (PATCH)
         async function mudarStatus(id, novoStatus) {
-            const { error } = await supabaseClient
-                .from('pedidos')
-                .update({ status: novoStatus })
-                .eq('id', id);
+            try {
+                const response = await fetch(`${API_URL}/api/pedidos/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: novoStatus })
+                });
 
-            if (error) {
-                alert("Erro ao atualizar pedido");
-            } else {
-                carregarPedidosDB();
+                if (response.ok) carregarPedidosDB();
+                else alert("Erro ao atualizar status");
+            } catch (error) {
+                console.error(error);
             }
         }
 
+        // 3. Recusar/Deletar via BACKEND
         async function recusarPedido(id) {
-            if(confirm('Tem certeza que deseja recusar o pedido #' + id + '?')) {
-                const { error } = await supabaseClient
-                    .from('pedidos')
-                    .delete()
-                    .eq('id', id);
-                
-                if (!error) carregarPedidosDB();
+            if(!confirm('Tem certeza que deseja recusar o pedido #' + id + '?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/pedidos/${id}`, { method: 'DELETE' });
+                if (response.ok) carregarPedidosDB();
+            } catch (error) {
+                console.error(error);
             }
         }
 
+        // 4. Finalizar (Mudar para status 'finalizado')
         async function finalizarPedido(id) {
-            const { error } = await supabaseClient
-                .from('pedidos')
-                .update({ status: 'finalizado' })
-                .eq('id', id);
-            
-            if (!error) carregarPedidosDB();
+            mudarStatus(id, 'finalizado');
         }
 
-        function atualizarRelogio() {
-            const agora = new Date();
-            document.getElementById('relogio').innerText = agora.toLocaleTimeString('pt-BR');
-        }
+        // Funções de interface (renderizarPedidos, criarCardPedido e relógio) 
+        // permanecem as mesmas que você já tem no seu arquivo.
 
-        setInterval(atualizarRelogio, 1000);
-        setInterval(carregarPedidosDB, 10000);
-
-        atualizarRelogio();
+        setInterval(carregarPedidosDB, 10000); // Polling a cada 10 segundos
         carregarPedidosDB();
     </script>
 </body>

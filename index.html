@@ -468,62 +468,56 @@
             });
         }
 
-        const supabaseUrl = 'https://mounfaoibkplygbcdraw.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vdW5mYW9pYmtwbHlnYmNkcmF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1OTYxMTQsImV4cCI6MjA5MDE3MjExNH0.PffWaRug2AqN2vnU1Xe7DK1Gh0teGRS9eaLM0fzGhAg';
-        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-        async function fecharPedido() {
-            if (carrinho.length === 0) return;
+    async function fecharPedido() {
+        if (carrinho.length === 0) return;
 
-            const nomeCliente = prompt("Por favor, digite seu nome para o pedido:");
-            if (!nomeCliente) {
-                alert("O nome é obrigatório para enviar o pedido.");
-                return;
-            }
-
-            const total = carrinho.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
-            const itensFormatados = carrinho.map(item => `${item.quantidade}x ${item.nome}`);
-
-            try {
-                const btn = document.querySelector('button[onclick="fecharPedido()"]');
-                const textoOriginal = btn.innerText;
-                btn.innerText = "Enviando...";
-                btn.disabled = true;
-
-                const { error } = await supabaseClient
-                    .from('pedidos')
-                    .insert([{ 
-                        cliente: nomeCliente, 
-                        itens: itensFormatados,
-                        total: total,
-                        tipo_entrega: 'Delivery' 
-                    }]);
-
-                if (error) throw error;
-
-                alert("Pedido enviado para a cozinha com sucesso!");
-                
-                carrinho = []; 
-                atualizarCarrinho();
-                fecharModalCarrinho();
-
-            } catch (error) {
-                console.error("Erro ao enviar pedido:", error);
-                alert("Ocorreu um erro ao enviar o pedido. Tente novamente.");
-            } finally {
-                const btn = document.querySelector('button[onclick="fecharPedido()"]');
-                btn.innerText = "Fechar Pedido";
-                btn.disabled = false;
-            }
+        const nomeCliente = prompt("Por favor, digite seu nome para o pedido:");
+        if (!nomeCliente) {
+            alert("O nome é obrigatório para enviar o pedido.");
+            return;
         }
 
-        if('serviceWorker' in navigator){
-            window.addEventListener('load', () =>{
-                navigator.serviceWorker.register('./sw.js')
-                .then(reg=>console.log("Service Worker Registrado no Porto!", reg))
-                .catch(err=>console.log("Erro ao preparar o sushi", err));
-            })
+        const total = carrinho.reduce((acc, item) => acc + (item.preco * item.quantidade), 0);
+        const itensFormatados = carrinho.map(item => `${item.quantidade}x ${item.nome}`);
+
+        try {
+            const btn = document.querySelector('button[onclick="fecharPedido()"]');
+            btn.innerText = "Enviando...";
+            btn.disabled = true;
+
+            const response = await fetch(`${API_URL}/api/pedidos`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    cliente: nomeCliente,
+                    itens: itensFormatados,
+                    total: total,
+                    tipo_entrega: 'Delivery'
+                })
+            });
+
+            const resultado = await response.json();
+
+            if (!response.ok) throw new Error(resultado.erro);
+
+            alert("Pedido enviado para a cozinha com sucesso!");
+            
+            carrinho = []; 
+            atualizarCarrinho();
+            fecharModalCarrinho();
+
+        } catch (error) {
+            console.error("Erro ao enviar pedido:", error);
+            alert("Erro ao conectar com o servidor: " + error.message);
+        } finally {
+            const btn = document.querySelector('button[onclick="fecharPedido()"]');
+            btn.innerText = "Fechar Pedido";
+            btn.disabled = false;
         }
+    }
     </script>
 </body>
 
